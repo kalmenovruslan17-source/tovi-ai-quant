@@ -109,10 +109,15 @@ def pack_linear(layer: SVDQuantLinear, dtype: torch.dtype = torch.bfloat16) -> d
 
     scale = qw.group_scale.to(dtype).view(oc, 1, ic // group, 1)
     smooth = layer.smooth.to(dtype).view(-1, 1)
+    wscales = (
+        packer.pack_micro_scale(scale, group_size=group)
+        if qw.precision == "nvfp4"
+        else packer.pack_scale(scale, group_size=group)
+    )
     packed = {
         "qweight": packer.pack_weight(qw.codes.to(torch.int32).contiguous()),
         # nvfp4 goes through pack_micro_scale (-> fp8 e4m3), int4 through pack_scale.
-        "wscales": packer.pack_scale(scale, group_size=group),
+        "wscales": wscales,
         "smooth": packer.pack_scale(smooth, group_size=-1),
         "proj_down": packer.pack_lowrank_weight(layer.lora_down.to(dtype).contiguous(), down=True),
         "proj_up": packer.pack_lowrank_weight(layer.lora_up.to(dtype).contiguous(), down=False),
