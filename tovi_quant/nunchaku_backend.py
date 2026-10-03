@@ -118,7 +118,7 @@ def pack_linear(layer: SVDQuantLinear, dtype: torch.dtype = torch.bfloat16) -> d
         "proj_up": packer.pack_lowrank_weight(layer.lora_up.to(dtype).contiguous(), down=False),
     }
     if qw.precision == "nvfp4":
-        packed["wcscales"] = torch.ones(oc, dtype=torch.float8_e4m3fn, device=device)
+        packed["wcscales"] = torch.ones(oc, dtype=dtype, device=device)
         packed["wtscale"] = torch.tensor([qw.tensor_scale], dtype=torch.float32)
     return packed
 
