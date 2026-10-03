@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import importlib.machinery
 import math
 import os
 import sys
@@ -30,6 +31,8 @@ def _stub_package(name: str, path: list[str]) -> None:
     module = types.ModuleType(name)
     module.__path__ = path
     module.__package__ = name
+    module.__spec__ = importlib.machinery.ModuleSpec(name, loader=None, is_package=True)
+    module.__spec__.submodule_search_locations = path
     sys.modules[name] = module
 
 

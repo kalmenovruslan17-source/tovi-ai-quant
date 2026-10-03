@@ -31,7 +31,7 @@ if [ ! -d "$SRC_DIR/.git" ]; then
 fi
 git -C "$SRC_DIR" fetch --depth 1 origin "$NUNCHAKU_REF"
 git -C "$SRC_DIR" checkout --force "$NUNCHAKU_REF"
-git -C "$SRC_DIR" submodule update --init --recursive --depth 1
+git -C "$SRC_DIR" submodule update --init --recursive
 
 echo "== building nunchaku @ $NUNCHAKU_REF (NUNCHAKU_INSTALL_MODE=${NUNCHAKU_INSTALL_MODE:-FAST})"
 (cd "$SRC_DIR" && \
