@@ -173,6 +173,12 @@ def main():
     print(f"[gpu_worker:{WORKER_MODE}] loading VideoGenerator on main thread (one-time, takes several minutes)...", flush=True)
     t0 = time.time()
     state["generator"] = _load_t2va() if WORKER_MODE == "t2va" else _load_ref2va()
+    lora_path = os.environ.get("LORA_PATH")
+    if lora_path:
+        lora_nickname = os.environ.get("LORA_NICKNAME", "turbo")
+        lora_strength = float(os.environ.get("LORA_STRENGTH", "1.0"))
+        state["generator"].set_lora_adapter(lora_nickname, lora_path, strength=lora_strength)
+        print(f"[gpu_worker:{WORKER_MODE}] LoRA adapter {lora_nickname} loaded from {lora_path} (strength={lora_strength})", flush=True)
     state["ready"] = True
     print(f"[gpu_worker:{WORKER_MODE}] READY. model loaded in {time.time()-t0:.1f}s. starting HTTP server on 127.0.0.1:{WORKER_PORT}", flush=True)
     uvicorn.run(app, host="127.0.0.1", port=WORKER_PORT)
