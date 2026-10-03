@@ -55,7 +55,7 @@ _BUFFER_NAMES = ("qweight", "wscales", "smooth", "proj_down", "proj_up", "wcscal
 @dataclass(frozen=True)
 class SVDQSettings:
     rank: int = 32
-    precision: str = "auto"  # auto | nvfp4 | int4
+    precision: str = "int4"  # auto | nvfp4 | int4 (int4 is the production default: nvfp4 has an unresolved ~6-8pct kernel_vs_model mismatch on this GPU)
     layers: str = "all"  # preset name from LAYER_PRESETS or a raw regex
     cache_path: str = ""  # packed-weights safetensors; "" disables caching
     calib_path: str = ""  # activation stats from QUANT_MODE=calib; "" = no smoothing
