@@ -27,6 +27,9 @@ from fastvideo.api import (
 )
 from fastvideo.pipelines.basic.minimax_h3.reference import MiniMaxH3Reference
 
+from tovi_quant import build_quantization, get_quant_mode
+from tovi_quant.modes import describe as describe_quant
+
 MODEL_PATH = "/workspace/models/fasth3"
 REF2VA_MODEL_PATH = "/workspace/models/minimax_h3"
 
@@ -35,9 +38,15 @@ WORKER_PORT = int(os.environ.get("GPU_WORKER_PORT", "8091" if WORKER_MODE == "t2
 
 assert WORKER_MODE in ("t2va", "ref2va"), f"bad GPU_WORKER_MODE: {WORKER_MODE}"
 
+# bf16 (default, unchanged production path) | fp4 | svdq | calib -- see tovi_quant/modes.py
+QUANT_MODE = get_quant_mode()
+# t2va keeps FastVideo's default DiT layerwise CPU offload; with a 4-bit DiT the
+# whole model can stay on the GPU (T2VA_DIT_OFFLOAD=0).
+T2VA_DIT_OFFLOAD = os.environ.get("T2VA_DIT_OFFLOAD", "1") != "0"
+
 app = FastAPI(title=f"Tovi GPU Worker [{WORKER_MODE}]")
 
-state = {"ready": False, "generator": None, "mode": WORKER_MODE}
+state = {"ready": False, "generator": None, "mode": WORKER_MODE, "quant_mode": QUANT_MODE}
 gen_lock = threading.Lock()
 
 
@@ -54,10 +63,11 @@ class GenReq(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"ready": state["ready"], "mode": state["mode"]}
+    return {"ready": state["ready"], "mode": state["mode"], "quant_mode": state["quant_mode"]}
 
 
 def _load_t2va():
+    offload = {} if T2VA_DIT_OFFLOAD else {"offload": OffloadConfig(dit=False, dit_layerwise=False)}
     return VideoGenerator.from_config(
         GeneratorConfig(
             model_path=MODEL_PATH,
@@ -67,6 +77,8 @@ def _load_t2va():
                 execution_backend="mp",
                 use_fsdp_inference=False,
                 parallelism=ParallelismConfig(tp_size=1, sp_size=1),
+                quantization=build_quantization(QUANT_MODE, WORKER_MODE),
+                **offload,
             ),
         )
     )
@@ -81,6 +93,7 @@ def _load_ref2va():
                 use_fsdp_inference=False,
                 parallelism=ParallelismConfig(tp_size=1, sp_size=1),
                 offload=OffloadConfig(dit=False, dit_layerwise=False, text_encoder=True, vae=True, pin_cpu_memory=False),
+                quantization=build_quantization(QUANT_MODE, WORKER_MODE),
             ),
             pipeline=PipelineSelection(
                 workload_type="i2v",
@@ -148,7 +161,7 @@ async def generate(req: GenReq):
         elapsed, result = await loop.run_in_executor(None, _run, req)
         ok = Path(req.output_path).exists()
         print(f"[gpu_worker:{WORKER_MODE}] generation done in {elapsed:.1f}s ok={ok} -> {req.output_path}", flush=True)
-        return {"ok": ok, "video_path": req.output_path, "elapsed": elapsed}
+        return {"ok": ok, "video_path": req.output_path, "elapsed": elapsed, "quant_mode": QUANT_MODE}
     except Exception as e:
         err = f"{e}\n{traceback.format_exc()}"
         print(f"[gpu_worker:{WORKER_MODE}] generation FAILED: {err}", flush=True)
@@ -156,6 +169,7 @@ async def generate(req: GenReq):
 
 
 def main():
+    print(f"[gpu_worker:{WORKER_MODE}] quant: {describe_quant(QUANT_MODE, WORKER_MODE)}", flush=True)
     print(f"[gpu_worker:{WORKER_MODE}] loading VideoGenerator on main thread (one-time, takes several minutes)...", flush=True)
     t0 = time.time()
     state["generator"] = _load_t2va() if WORKER_MODE == "t2va" else _load_ref2va()

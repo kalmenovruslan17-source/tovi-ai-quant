@@ -1,0 +1,8 @@
+# API (main.py) + GPU worker HTTP layer. FastVideo itself is installed from source
+# (pod: /root/FastVideo, Docker: the FastVideo base image) and brings torch,
+# diffusers, transformers and flashinfer-python.
+fastapi
+uvicorn
+httpx
+pydantic
+python-multipart  # UploadFile in main.py

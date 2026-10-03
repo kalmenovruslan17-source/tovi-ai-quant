@@ -1,0 +1,18 @@
+# QUANT_MODE=svdq / calib on top of requirements.txt + FastVideo.
+#
+# nunchaku is NOT installed from PyPI: it must be compiled against the exact
+# torch/CUDA of the worker venv, for sm_120a (Blackwell). Use
+#   scripts/install_quant.sh          (on the pod, GPU visible)
+# or the Dockerfile (NUNCHAKU_INSTALL_MODE=ALL). Both build commit
+#   nunchaku-tech/nunchaku@302e0e97024ebd68688fe890e5df83731edf7b54
+# with --no-deps: tovi_quant only uses nunchaku's kernels + packer, so its
+# diffusers/transformers pins must not override FastVideo's.
+#
+# Runtime deps of the nunchaku modules tovi_quant imports:
+safetensors
+huggingface_hub
+# QUANT_MODE=fp4 (FastVideo native NVFP4) needs flashinfer-python >= the
+# version FastVideo pins; it is already a FastVideo dependency on Linux.
+#
+# scripts/bench_quant.py: numpy + the ffmpeg/ffprobe binaries.
+numpy
